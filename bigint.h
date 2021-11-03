@@ -45,6 +45,8 @@ bigint* BINT_makep(void* p, size_t size);
 
 /// Make a copy of bi.
 bigint* BINT_cp(const bigint* bi);
+/// Set the value of bi to i.
+void BINT_setui(bigint* bi, uint32_t i);
 
 bigint* BINT_atoi(const char* str);
 char* BINT_itoa(const bigint* bi);

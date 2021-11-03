@@ -65,6 +65,14 @@ bigint* BINT_cp(const bigint* bi) {
     return cp;
 }
 
+void BINT_setui(bigint* bi, uint32_t i) {
+    free(bi->data);
+    bi->n = 1;
+    bi->data = (bint_blk_type*)malloc(BINT_BLK_SZ);
+    bi->data[0] = i;
+    bi->flags &= ~BIGINT_FLAG_NEG;
+}
+
 int BINT_shl(bigint* bi, size_t nbit) {
     int leading_zeroes = __builtin_clz(bi->data[bi->n - 1]);
     size_t add_zero_blks = nbit / BINT_BLK_BIT_SZ;
@@ -194,9 +202,48 @@ bigint* BINT_divmod(bigint* n, const bigint* div) {
     return result;
 }
 
-int BINT_mul(const bigint* l, const bigint* r, bigint* res) {}
+int BINT_mul(const bigint* l, const bigint* r, bigint* res) {
+    free(res->data);
+    _bint_init_with_size(res, l->n + r->n, NULL);
+    memset(res->data, 0, BINT_BLK_SZ * res->n);
+    if (BINT_isneg(l) ^ BINT_isneg(r)) {
+        BINT_neg(res);
+    }
+
+    const bigint* big = (l->n >= r->n) ? l : r;
+    const bigint* small = (big == l) ? r : l;
+
+    bint_blk_type* buf = (bint_blk_type*)malloc(BINT_BLK_SZ * (big->n + 1));
+
+    size_t i, j, res_idx;
+    bint_blk_type carry_mult, carry_add;
+    uint64_t tmp;
+    // multiplier loop
+    for (i = 0; i < small->n; i++) {
+        carry_mult = 0;
+        for (j = 0; j < big->n; j++) {
+            tmp = (uint64_t)big->data[j] * small->data[i] + carry_mult;
+            carry_mult = tmp >> BINT_BLK_BIT_SZ;
+            // TODO: optimization here. we don't need the buffer. we can
+            // directly add to it.
+            buf[j] = (bint_blk_type)tmp;
+        }
+        buf[j] = carry_mult;
+
+        carry_add = 0;
+        for (res_idx = i, j = 0; j < big->n + 1; res_idx++, j++) {
+            tmp = (uint64_t)res->data[res_idx] + buf[j] + carry_add;
+            carry_add = tmp >> BINT_BLK_BIT_SZ;
+            res->data[res_idx] = (bint_blk_type)tmp;
+        }
+        res->data[res_idx] = carry_add;
+    }
+    return BINT_rlz(res);
+}
 
 int BINT_add(const bigint* l, const bigint* r, bigint* res) {
+    free(res->data);
+
     bint_blk_type carry = 0;
     uint64_t tmp;
     const bigint* big = (l->n >= r->n) ? l : r;
