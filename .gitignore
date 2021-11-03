@@ -1,0 +1,14 @@
+*.exe
+*.o
+*.so
+*.a
+*.lib
+*.dll
+*.dylib
+*.so.*
+*.la
+*.lo
+*.lai
+*.lof
+
+.vscode/
