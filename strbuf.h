@@ -25,6 +25,7 @@ static inline strbuf* STRBUF_new_with_capacity(size_t capacity) {
     buf->capacity = capacity;
     buf->data = (char*)malloc(capacity);
     buf->size = 0;
+    return buf;
 }
 
 static inline strbuf* STRBUF_new() {
