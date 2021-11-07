@@ -202,6 +202,21 @@ bigint* BINT_divmod(bigint* n, const bigint* div) {
     return result;
 }
 
+int BINT_multo_imm(bigint* b, uint32_t imm) {
+    bint_blk_type carry = 0;
+    uint64_t tmp;
+    for (size_t i = 0; i < b->n; i++) {
+        tmp = (uint64_t)b->data[i] * imm + carry;
+        carry = tmp >> BINT_BLK_BIT_SZ;
+        b->data[i] = (bint_blk_type)tmp;
+    }
+    if (carry) {
+        BINT_REALLOC(b, b->n + 1);
+        b->data[b->n - 1] = carry;
+    }
+    return 0;
+}
+
 int BINT_mul(const bigint* l, const bigint* r, bigint* res) {
     free(res->data);
     _bint_init_with_size(res, l->n + r->n, NULL);
@@ -239,6 +254,23 @@ int BINT_mul(const bigint* l, const bigint* r, bigint* res) {
         res->data[res_idx] = carry_add;
     }
     return BINT_rlz(res);
+}
+
+int BINT_addto_imm(bigint* b, uint32_t imm) {
+    if (!b->n) return 1;
+    uint64_t tmp = (uint64_t)b->data[0] + imm;
+    b->data[0] = (bint_blk_type)tmp;
+    bint_blk_type carry = tmp >> BINT_BLK_BIT_SZ;
+    for (size_t i = 1; i < b->n; i++) {
+        tmp = (uint64_t)b->data[i] + carry;
+        carry = tmp >> BINT_BLK_BIT_SZ;
+        b->data[i] = (bint_blk_type)tmp;
+    }
+    if (carry) {
+        BINT_REALLOC(b, b->n + 1);
+        b->data[b->n - 1] = carry;
+    }
+    return 0;
 }
 
 int BINT_add(const bigint* l, const bigint* r, bigint* res) {
@@ -312,6 +344,7 @@ int BINT_set_bit_at(bigint* bi, size_t idx, bool set) {
 }
 
 char* BINT_itoa(const bigint* bi) {
+    if (!bi || !bi->n) return NULL;
     strbuf* sb = STRBUF_new();
     bigint* ten = BINT_makeui(10u);
 
@@ -336,6 +369,27 @@ char* BINT_itoa(const bigint* bi) {
     char* res = STRBUF_tocstr(sb);
     STRBUF_free(sb);
     return res;
+}
+
+bigint* BINT_atoi(const char* str) {
+    bigint* bi = BINT_zero();
+    int err;
+    for (size_t i = 0;; i++) {
+        if (str[i] > '9' || str[i] < '0') goto ERROR;
+
+        err = BINT_addto_imm(bi, str[i] - '0');
+        if (err) goto ERROR;
+
+        if (!str[i + 1]) break;
+
+        err = BINT_multo_imm(bi, 10u);
+        if (err) goto ERROR;
+    }
+    return bi;
+
+ERROR:
+    BINT_free(bi);
+    return NULL;
 }
 
 inline void _bint_init_with_size(bigint* bi, size_t n, void* val) {

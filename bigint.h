@@ -74,8 +74,11 @@ int BINT_rlz(bigint* b);
 /// Divide n by d, return the result, and put remainder in n.
 bigint* BINT_divmod(bigint* n, const bigint* div);
 
+int BINT_multo_imm(bigint* b, uint32_t imm);
 int BINT_mul(const bigint* l, const bigint* r, bigint* res);
 
+/// Add an immediate value imm to a bigint b.
+int BINT_addto_imm(bigint* b, uint32_t imm);
 int BINT_add(const bigint* l, const bigint* r, bigint* res);
 /// Subtract b from a. Assumed a >= b.
 /// a -= b.
