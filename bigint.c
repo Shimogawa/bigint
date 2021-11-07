@@ -2,6 +2,32 @@
 
 #include "strbuf.h"
 
+uint32_t _bint_10_exp(int x) {
+    switch (x) {
+        case 0:
+            return 1u;
+        case 1:
+            return 10u;
+        case 2:
+            return 100u;
+        case 3:
+            return 1000u;
+        case 4:
+            return 10000u;
+        case 5:
+            return 100000u;
+        case 6:
+            return 1000000u;
+        case 7:
+            return 10000000u;
+        case 8:
+            return 100000000u;
+        case 9:
+            return 1000000000u;
+    }
+    return 1;
+}
+
 bigint* BINT_make() {
     bigint* bi = (bigint*)malloc(sizeof(bigint));
     bi->n = 0;
@@ -373,16 +399,25 @@ char* BINT_itoa(const bigint* bi) {
 
 bigint* BINT_atoi(const char* str) {
     bigint* bi = BINT_zero();
+    size_t len = strlen(str);
+    size_t numblk = len / 9 + 1;
     int err;
+    char buf[10];
+    buf[9] = 0;
+    uint32_t tmp;
     for (size_t i = 0;; i++) {
-        if (str[i] > '9' || str[i] < '0') goto ERROR;
+        strncpy(buf, str + (i * 9), 9);
+        tmp = atoi(buf);
+        err = BINT_addto_imm(bi, tmp);
 
-        err = BINT_addto_imm(bi, str[i] - '0');
         if (err) goto ERROR;
+        if (i + 1 >= numblk) break;
 
-        if (!str[i + 1]) break;
-
-        err = BINT_multo_imm(bi, 10u);
+        if (i + 2 >= numblk)
+            err =
+                BINT_multo_imm(bi, _bint_10_exp(len % 9 == 0 ? 9 : (len % 9)));
+        else
+            err = BINT_multo_imm(bi, 1000000000u);
         if (err) goto ERROR;
     }
     return bi;
