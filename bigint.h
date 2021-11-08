@@ -73,7 +73,13 @@ int BINT_rlz(bigint* b);
 /// d / n -> res ... n
 /// Divide n by d, return the result, and put remainder in n.
 bigint* BINT_divmod(bigint* n, const bigint* div);
-
+/**
+ * @brief Multiply b by an immediate 32-bit unsigned integer value imm.
+ *
+ * @param b bigint as receiver
+ * @param imm the immediate
+ * @return the return code. 0 for success, 1 for failure.
+ */
 int BINT_multo_imm(bigint* b, uint32_t imm);
 int BINT_mul(const bigint* l, const bigint* r, bigint* res);
 

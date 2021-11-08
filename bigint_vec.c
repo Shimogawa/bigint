@@ -1,5 +1,6 @@
-#include "bigint.h"
+#include <immintrin.h>
 
+#include "bigint.h"
 #include "strbuf.h"
 #include "string.h"
 
@@ -257,20 +258,51 @@ int BINT_mul(const bigint* l, const bigint* r, bigint* res) {
 
     bint_blk_type* buf = (bint_blk_type*)malloc(BINT_BLK_SZ * (big->n + 1));
 
-    size_t i, j, res_idx;
+    size_t i, j, k, res_idx;
     bint_blk_type carry_mult, carry_add;
+
+    __m256i m;
+    const __m256i masklo = _mm256_set1_epi64x(UINT32_MAX);
+    const __m256i maskhi = _mm256_set1_epi64x(0xFFFFFFFF00000000);
+    uint32_t tmp_res[8], tmp_carry[8];
     uint64_t tmp;
+
     // multiplier loop
     for (i = 0; i < small->n; i++) {
         carry_mult = 0;
-        for (j = 0; j < big->n; j++) {
-            tmp = (uint64_t)big->data[j] * small->data[i] + carry_mult;
-            carry_mult = tmp >> BINT_BLK_BIT_SZ;
-            // TODO: optimization here. we don't need the buffer. we can
-            // directly add to it.
+        for (j = 0; j < big->n; j += 8) {
+            m = _mm256_set1_epi64x(small->data[i]);
+            __m256i v = _mm256_loadu_si256((__m256i*)(big->data + j));
+            __m256i ve = v;
+            __m256i vo = _mm256_srli_epi64(v, 32);
+            __m256i re = _mm256_mul_epu32(ve, m);
+            __m256i ro = _mm256_mul_epu32(vo, m);
+
+            __m256i reres = _mm256_and_si256(re, masklo);
+            __m256i rores = _mm256_and_si256(_mm256_slli_epi64(ro, 32), maskhi);
+            __m256i res =
+                _mm256_or_si256(reres, rores);  // the result (low 32 bit)
+
+            __m256i recarry = _mm256_srli_epi64(re, 32);
+            __m256i rocarry = _mm256_and_si256(ro, maskhi);
+            __m256i carry =
+                _mm256_or_si256(recarry, rocarry);  // the result (high 32 bit)
+
+            _mm256_storeu_si256((__m256i*)tmp_res, res);
+            _mm256_storeu_si256((__m256i*)tmp_carry, carry);
+
+            tmp = tmp_res[0] + carry_mult;
             buf[j] = (bint_blk_type)tmp;
+            carry_mult = tmp >> BINT_BLK_BIT_SZ;
+
+            for (k = 1; k < 8 && (j + k < big->n); k++) {
+                tmp = (uint64_t)carry_mult + tmp_res[k] + tmp_carry[k - 1];
+                buf[j + k] = (bint_blk_type)tmp;
+                carry_mult = tmp >> BINT_BLK_BIT_SZ;
+            }
+            carry_mult += tmp_carry[k - 1];
         }
-        buf[j] = carry_mult;
+        buf[big->n] = carry_mult;
 
         carry_add = 0;
         for (res_idx = i, j = 0; j < big->n + 1; res_idx++, j++) {
@@ -280,6 +312,7 @@ int BINT_mul(const bigint* l, const bigint* r, bigint* res) {
         }
         res->data[res_idx] = carry_add;
     }
+    free(buf);
     return BINT_rlz(res);
 }
 
