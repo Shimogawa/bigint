@@ -398,8 +398,13 @@ char* BINT_itoa(const bigint* bi) {
     return res;
 }
 
-bigint* BINT_atoi(const char* str) {
+bigint* BINT_atoi(const char* s) {
     bigint* bi = BINT_zero();
+    char* str = s;
+    if (str[0] == '-') {
+        BINT_neg(bi);
+        str++;
+    }
     size_t len = strlen(str);
     size_t numblk = len / 9 + 1;
     int err;
