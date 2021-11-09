@@ -263,8 +263,9 @@ int BINT_mul(const bigint* l, const bigint* r, bigint* res) {
 
     __m256i m;
     const __m256i masklo = _mm256_set1_epi64x(UINT32_MAX);
-    const __m256i maskhi = _mm256_set1_epi64x(0xFFFFFFFF00000000);
-    uint32_t tmp_res[8], tmp_carry[8];
+    // const __m256i maskhi = _mm256_set1_epi64x(0xFFFFFFFF00000000);
+    // uint32_t tmp_res[8], tmp_carry[8];
+    uint64_t tmp_res[8];
     uint64_t tmp;
 
     // multiplier loop
@@ -273,44 +274,70 @@ int BINT_mul(const bigint* l, const bigint* r, bigint* res) {
         for (j = 0; j < big->n; j += 8) {
             m = _mm256_set1_epi64x(small->data[i]);
             __m256i v = _mm256_loadu_si256((__m256i*)(big->data + j));
-            __m256i ve = v;
-            __m256i vo = _mm256_srli_epi64(v, 32);
+            __m256i ve = _mm256_srli_epi64(v, 32);
+            __m256i ro = _mm256_mul_epu32(v, m);
             __m256i re = _mm256_mul_epu32(ve, m);
-            __m256i ro = _mm256_mul_epu32(vo, m);
 
-            __m256i reres = _mm256_and_si256(re, masklo);
-            __m256i rores = _mm256_and_si256(_mm256_slli_epi64(ro, 32), maskhi);
-            __m256i res =
-                _mm256_or_si256(reres, rores);  // the result (low 32 bit)
+            // __m256i reres = _mm256_and_si256(re, masklo);
+            // __m256i rores = _mm256_and_si256(_mm256_slli_epi64(ro, 32),
+            // maskhi);
+            // __m256i res =
+            //     _mm256_or_si256(reres, rores);  // the result (low 32 bit)
 
-            __m256i recarry = _mm256_srli_epi64(re, 32);
-            __m256i rocarry = _mm256_and_si256(ro, maskhi);
-            __m256i carry =
-                _mm256_or_si256(recarry, rocarry);  // the result (high 32 bit)
+            // __m256i recarry = _mm256_srli_epi64(re, 32);
+            // __m256i rocarry = _mm256_and_si256(ro, maskhi);
+            // __m256i carry =
+            //     _mm256_or_si256(recarry, rocarry);  // the result (high 32
+            //     bit)
 
-            _mm256_storeu_si256((__m256i*)tmp_res, res);
-            _mm256_storeu_si256((__m256i*)tmp_carry, carry);
+            // _mm256_storeu_si256((__m256i*)tmp_res, res);
+            // _mm256_storeu_si256((__m256i*)tmp_carry, carry);
 
-            tmp = tmp_res[0] + carry_mult;
-            buf[j] = (bint_blk_type)tmp;
-            carry_mult = tmp >> BINT_BLK_BIT_SZ;
+            tmp_res[0] = ro[0];
+            tmp_res[2] = ro[1];
+            tmp_res[4] = ro[2];
+            tmp_res[6] = ro[3];
+            tmp_res[1] = re[0];
+            tmp_res[3] = re[1];
+            tmp_res[5] = re[2];
+            tmp_res[7] = re[3];
 
-            for (k = 1; k < 8 && (j + k < big->n); k++) {
-                tmp = (uint64_t)carry_mult + tmp_res[k] + tmp_carry[k - 1];
+            for (k = 0; k < 8 && (j + k < big->n); k++) {
+                tmp = tmp_res[k] + carry_mult;
                 buf[j + k] = (bint_blk_type)tmp;
                 carry_mult = tmp >> BINT_BLK_BIT_SZ;
             }
-            carry_mult += tmp_carry[k - 1];
         }
         buf[big->n] = carry_mult;
 
         carry_add = 0;
-        for (res_idx = i, j = 0; j < big->n + 1; res_idx++, j++) {
-            tmp = (uint64_t)res->data[res_idx] + buf[j] + carry_add;
-            carry_add = tmp >> BINT_BLK_BIT_SZ;
-            res->data[res_idx] = (bint_blk_type)tmp;
+        for (res_idx = i, j = 0; j < big->n + 1; res_idx += 8, j += 8) {
+            __m256i ao = _mm256_loadu_si256((__m256i*)(res->data + res_idx));
+            __m256i bo = _mm256_loadu_si256((__m256i*)(buf + j));
+            __m256i ae = _mm256_srli_epi64(ao, 32);
+            __m256i be = _mm256_srli_epi64(bo, 32);
+            ao = _mm256_and_si256(ao, masklo);
+            bo = _mm256_and_si256(bo, masklo);
+
+            __m256i sume = _mm256_add_epi64(ae, be);
+            __m256i sumo = _mm256_add_epi64(ao, bo);
+
+            tmp_res[0] = sumo[0];
+            tmp_res[2] = sumo[1];
+            tmp_res[4] = sumo[2];
+            tmp_res[6] = sumo[3];
+            tmp_res[1] = sume[0];
+            tmp_res[3] = sume[1];
+            tmp_res[5] = sume[2];
+            tmp_res[7] = sume[3];
+
+            for (k = 0; k < 8 && (j + k < big->n + 1); k++) {
+                tmp = tmp_res[k] + carry_add;
+                res->data[res_idx + k] = (bint_blk_type)tmp;
+                carry_add = tmp >> BINT_BLK_BIT_SZ;
+            }
         }
-        res->data[res_idx] = carry_add;
+        res->data[i + big->n + 1] = carry_add;
     }
     free(buf);
     return BINT_rlz(res);
