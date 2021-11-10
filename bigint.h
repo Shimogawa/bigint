@@ -48,7 +48,7 @@ bigint* BINT_cp(const bigint* bi);
 /// Set the value of bi to i.
 void BINT_setui(bigint* bi, uint32_t i);
 
-bigint* BINT_atoi(const char* str);
+bigint* BINT_atoi(const char* s);
 char* BINT_itoa(const bigint* bi);
 
 /// Shift left n bits.

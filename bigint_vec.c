@@ -246,7 +246,7 @@ int BINT_multo_imm(bigint* b, uint32_t imm) {
 }
 
 int BINT_mul(const bigint* l, const bigint* r, bigint* res) {
-    free(res->data);
+    if (res->data) free(res->data);
     _bint_init_with_size(res, l->n + r->n, NULL);
     memset(res->data, 0, BINT_BLK_SZ * res->n);
     if (BINT_isneg(l) ^ BINT_isneg(r)) {
@@ -337,7 +337,7 @@ int BINT_mul(const bigint* l, const bigint* r, bigint* res) {
                 carry_add = tmp >> BINT_BLK_BIT_SZ;
             }
         }
-        res->data[i + big->n + 1] = carry_add;
+        res->data[i + big->n] += carry_add;
     }
     free(buf);
     return BINT_rlz(res);
@@ -458,8 +458,13 @@ char* BINT_itoa(const bigint* bi) {
     return res;
 }
 
-bigint* BINT_atoi(const char* str) {
+bigint* BINT_atoi(const char* s) {
     bigint* bi = BINT_zero();
+    char* str = (char*)s;
+    if (str[0] == '-') {
+        BINT_neg(bi);
+        str++;
+    }
     size_t len = strlen(str);
     size_t numblk = len / 9 + 1;
     int err;

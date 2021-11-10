@@ -400,7 +400,7 @@ char* BINT_itoa(const bigint* bi) {
 
 bigint* BINT_atoi(const char* s) {
     bigint* bi = BINT_zero();
-    char* str = s;
+    char* str = (char*)s;
     if (str[0] == '-') {
         BINT_neg(bi);
         str++;
