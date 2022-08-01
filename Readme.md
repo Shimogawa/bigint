@@ -40,9 +40,17 @@ BINT_free(bi);
 Arithmetic functions:
 
 - `BINT_add`: only supports non-negative now.
+
+```c
+bigint* a = BINT_atoi("41574280935842903589085243");
+bigint* b = BINT_atoi("3284923071943289748237424428520");
+bigint* res = BINT_make(); // makes an empty bigint for result
+BINT_add(a, b, res); // res = a + b
+```
+
 - `BINT_mul`
 
 ```c
-bigint* res = BINT_make(); // makes an empty bigint
+bigint* res = BINT_make(); // makes an empty bigint for result
 BINT_mul(a, b, res); // res = a * b
 ```
